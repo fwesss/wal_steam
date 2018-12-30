@@ -13,61 +13,86 @@ o888o  o888o `Y8bod8P'   "888" `Y888""8o
                @nilsu.org
 === Copyright (C) 2018  Dakota Walsh ===
 """
-import shutil                             # copying files
-import os                                 # getting paths
-import urllib.request                     # downloading the zip files
-import zipfile                            # extracting the zip files
-import sys
-import argparse                           # argument parsing
-import textwrap
+import argparse  # argument parsing
+import os  # getting paths
 import re
-from distutils.dir_util import copy_tree  # copytree from shutil is broken so use copy_tree
+import shutil  # copying files
+import sys
+import textwrap
+import urllib.error
+import urllib.request  # downloading the zip files
+import zipfile  # extracting the zip files
 from argparse import RawTextHelpFormatter
+from distutils.dir_util import \
+    copy_tree  # copytree from shutil is broken so use copy_tree
 
 # set some variables for the file locations
-HOME_DIR          = os.getenv("HOME", os.getenv("USERPROFILE")) # should be crossplatform
-CACHE_DIR         = os.path.join(HOME_DIR, ".cache", "wal_steam")
-CONFIG_DIR        = os.path.join(HOME_DIR, ".config", "wal_steam")
-SKIN_NAME         = "Metro 4.3.1 Wal_Mod"
-VERSION           = "1.3.1"
-CONFIG_FILE       = "wal_steam.conf"
-COLORS_FILE       = os.path.join(CACHE_DIR, "custom.styles")
-CONFIG_URL        = "https://raw.githubusercontent.com/kotajacob/wal_steam_config/master/wal_steam.conf"
+HOME_DIR = os.getenv("HOME",
+                     os.getenv("USERPROFILE"))  # should be crossplatform
+CACHE_DIR = os.path.join(HOME_DIR, ".cache", "wal_steam")
+CONFIG_DIR = os.path.join(HOME_DIR, ".config", "wal_steam")
+SKIN_NAME = "Metro 4.3.1 Wal_Mod"
+VERSION = "1.3.1"
+CONFIG_FILE = "wal_steam.conf"
+COLORS_FILE = os.path.join(CACHE_DIR, "custom.styles")
+CONFIG_URL = "https://raw.githubusercontent.com/kotajacob/wal_steam_config" \
+             "/master/wal_steam.conf "
 
-STEAM_DIR_OTHER   = os.path.expanduser("~/.steam/steam/skins")
-STEAM_DIR_OSX     = os.path.expanduser("~/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS/skins")
-STEAM_DIR_UBUNTU  = os.path.expanduser("~/.steam/skins")
-STEAM_DIR_WINDOWS = "C:\Program Files (x86)\Steam\skins"
-WAL_COLORS        = os.path.join(HOME_DIR, ".cache", "wal", "colors.css")
-WPG_COLORS        = os.path.join(HOME_DIR, ".config", "wpg", "formats", "colors.css")
+STEAM_DIR_OTHER = os.path.expanduser("~/.steam/steam/skins")
+STEAM_DIR_OSX = os.path.expanduser(
+    "~/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents"
+    "/MacOS/skins")
+STEAM_DIR_UBUNTU = os.path.expanduser("~/.steam/skins")
+STEAM_DIR_WINDOWS = "C:\\Steam\\skins"
+WAL_COLORS = os.path.join(HOME_DIR, ".cache", "wal", "colors.css")
+WPG_COLORS = os.path.join(HOME_DIR, ".config", "wpg", "formats", "colors.css")
 
-METRO_URL                 = "http://metroforsteam.com/downloads/4.3.1.zip"
-METRO_ZIP                 = os.path.join(CACHE_DIR, "metroZip.zip")
-METRO_DIR                 = os.path.join(CACHE_DIR, "metroZip")
-METRO_COLORS_FILE         = os.path.join(METRO_DIR, "custom.styles")
+METRO_URL = "http://metroforsteam.com/downloads/4.3.1.zip"
+METRO_ZIP = os.path.join(CACHE_DIR, "metroZip.zip")
+METRO_DIR = os.path.join(CACHE_DIR, "metroZip")
+METRO_COLORS_FILE = os.path.join(METRO_DIR, "custom.styles")
 
-METRO_PATCH_URL  = "https://github.com/redsigma/UPMetroSkin/archive/e43f55b43f8ae565e162da664887051a1c76c5b4.zip" # A link to the version we've tested rather than the latest, just in case they break things upstream.
-METRO_PATCH_ZIP  = os.path.join(CACHE_DIR, "metroPatchZip.zip")
-METRO_PATCH_DIR  = os.path.join(CACHE_DIR, "metroPatchZip")
-METRO_PATCH_COPY = os.path.join(METRO_PATCH_DIR, "UPMetroSkin-e43f55b43f8ae565e162da664887051a1c76c5b4", "Unofficial 4.3.1 Patch", "Main Files [Install First]")
-METRO_PATCH_HDPI = os.path.join(METRO_PATCH_DIR, "UPMetroSkin-e43f55b43f8ae565e162da664887051a1c76c5b4", "Unofficial 4.3.1 Patch", "Extras", "High DPI", "Increased fonts", "Install")
+METRO_PATCH_URL = "https://github.com/redsigma/UPMetroSkin/archive" \
+                  "/e43f55b43f8ae565e162da664887051a1c76c5b4.zip"  # A link
+# to the version we've tested rather than the latest, just in case they
+# break things upstream.
+METRO_PATCH_ZIP = os.path.join(CACHE_DIR, "metroPatchZip.zip")
+METRO_PATCH_DIR = os.path.join(CACHE_DIR, "metroPatchZip")
+METRO_PATCH_COPY = os.path.join(METRO_PATCH_DIR,
+                                "UPMetroSkin"
+                                "-e43f55b43f8ae565e162da664887051a1c76c5b4",
+                                "Unofficial 4.3.1 Patch",
+                                "Main Files [Install First]")
+METRO_PATCH_HDPI = os.path.join(METRO_PATCH_DIR,
+                                "UPMetroSkin"
+                                "-e43f55b43f8ae565e162da664887051a1c76c5b4",
+                                "Unofficial 4.3.1 Patch", "Extras", "High DPI",
+                                "Increased fonts", "Install")
 
 # CLI colour and style sequences
-CLI_RED    = "\033[91m"
+CLI_RED = "\033[91m"
 CLI_YELLOW = "\033[93m"
-CLI_BOLD   = "\033[1m"
-CLI_END    = "\033[0m"
+CLI_BOLD = "\033[1m"
+CLI_END = "\033[0m"
+
 
 def tupToPrint(tup):
-    tmp = ' '.join(map(str, tup)) # convert the tupple (rgb color) to a string ready to print
+    tmp = ' '.join(map(str,
+                       tup))  # convert the tupple (rgb color) to a string
+    # ready to print
     return tmp
 
-def setCustomStyles(colors, variables, walColors, alpha, steam_dir, fonts = []):
-    print ("Patching new colors")
+
+def setCustomStyles(colors, variables, walColors, alpha, steam_dir,
+                    fonts=None):
+    if fonts is None:
+        fonts = []
+    print("Patching new colors")
 
     # delete the old colors file if present in cache
     try:
-        os.remove(COLORS_FILE) # just in case it was already there for some reason
+        os.remove(
+            COLORS_FILE)  # just in case it was already there for some reason
     except FileNotFoundError:
         print("No file to remove")
 
@@ -78,7 +103,9 @@ def setCustomStyles(colors, variables, walColors, alpha, steam_dir, fonts = []):
     patches = []
     ii = 0
     for i in variables:
-        patches.append(i + '="' + tupToPrint(colors[int(walColors[ii])]) + ' ' + str(alpha[ii]) + '"')
+        patches.append(
+            i + '="' + tupToPrint(colors[int(walColors[ii])]) + ' ' + str(
+                alpha[ii]) + '"')
         ii = ii + 1
 
     wal_styles = "\n".join(patches)
@@ -119,81 +146,91 @@ def replaceFonts(styles, fonts):
 
     return styles
 
+
 ###################
 # color functions #
 ###################
 def getConfigAlpha():
-    # read the config file and return a dictionary of the variables and color variables
+    # read the config file and return a dictionary of the variables and
+    # color variables
     f = open(os.path.join(CONFIG_DIR, CONFIG_FILE), 'r')
 
-    # save the lines of the config file to rawFile
-    rawFile = f.readlines()
+    # save the lines of the config file to raw_file
+    raw_file = f.readlines()
 
-    # loop through rawFile
+    # loop through raw_file
     result = []
-    for line in rawFile:
-        tmpResult = line[line.find(",")+1:line.find("\n")]
-        result.append(tmpResult)
+    for line in raw_file:
+        tmp_result = line[line.find(",") + 1:line.find("\n")]
+        result.append(tmp_result)
     f.close()
     return result
+
 
 def getConfigColor():
-    # read the config file and return a dictionary of the variables and color variables
+    # read the config file and return a dictionary of the variables and
+    # color variables
     f = open(os.path.join(CONFIG_DIR, CONFIG_FILE), 'r')
 
-    # save the lines of the config file to rawFile
-    rawFile = f.readlines()
+    # save the lines of the config file to raw_file
+    raw_file = f.readlines()
 
-    # loop through rawFile
+    # loop through raw_file
     result = []
-    for line in rawFile:
-        tmpResult = line[line.find("=")+1:line.find(",")]
-        result.append(tmpResult)
+    for line in raw_file:
+        tmp_result = line[line.find("=") + 1:line.find(",")]
+        result.append(tmp_result)
     f.close()
     return result
+
 
 def getConfigVar():
-    # read the config file and return a dictionary of the variables and color variables
+    # read the config file and return a dictionary of the variables and
+    # color variables
     f = open(os.path.join(CONFIG_DIR, CONFIG_FILE), 'r')
 
-    # save the lines of the config file to rawFile
-    rawFile = f.readlines()
+    # save the lines of the config file to raw_file
+    raw_file = f.readlines()
 
-    # loop through rawFile
+    # loop through raw_file
     result = []
-    for line in rawFile:
-        tmpResult = line[:line.find("=")]
-        result.append(tmpResult)
+    for line in raw_file:
+        tmp_result = line[:line.find("=")]
+        result.append(tmp_result)
     f.close()
     return result
+
 
 def hexToRgb(hexColors):
     """Convert hex colors to rgb colors (takes a list)."""
     return [tuple(bytes.fromhex(color.strip("#"))) for color in hexColors]
 
+
 def getColors(mode):
-    if (mode == 0):
+    if mode == 0:
         # using colors from wal
-        colorsFile = WAL_COLORS
+        colors_file = WAL_COLORS
     else:
         # using colors from wpg
-        colorsFile = WPG_COLORS
+        colors_file = WPG_COLORS
     # parse the file
     print("Reading colors")
     try:
-        f = open(colorsFile, 'r')
-    except:
-        print("Error: Colors file missing. Make sure you've run pywal/wpg before wal_steam")
+        f = open(colors_file, 'r')
+    except FileNotFoundError:
+        print(
+            "Error: Colors file missing. Make sure you've run pywal/wpg "
+            "before wal_steam")
         sys.exit(1)
 
-    rawFile = f.readlines() # save the lines to rawFile
+    raw_file = f.readlines()  # save the lines to raw_file
     # delete the lines not involving the colors
-    del rawFile[0:11]
-    del rawFile[16]
+    del raw_file[0:11]
+    del raw_file[16]
 
-    # loop through rawFile and store colors in a list
+    # loop through raw_file and store colors in a list
     colors = []
-    for line in rawFile:
+    for line in raw_file:
         # delete everything but the hex code
         tmp = line[line.find("#"):]
         tmp = tmp[:7]
@@ -203,6 +240,7 @@ def getColors(mode):
 
     f.close()
     return colors
+
 
 ##########################
 # checkInstall functions #
@@ -220,10 +258,11 @@ def checkSkin(steam_dir, dpi):
         copy_tree(METRO_DIR, os.path.join(steam_dir, SKIN_NAME))
     else:
         print("Wal Steam skin found")
-        if (dpi==1):
+        if dpi == 1:
             # skin was not found, copy it over
             print("Forcing skin install for High DPI patches")
             copy_tree(METRO_DIR, os.path.join(steam_dir, SKIN_NAME))
+
 
 def makeSkin():
     # download metro for steam and extract
@@ -233,8 +272,10 @@ def makeSkin():
         opener.addheaders = [{'User-Agent', 'Mozilla/5.0'}]
         urllib.request.install_opener(opener)
         urllib.request.urlretrieve(METRO_URL, METRO_ZIP)
-    except:
-        print("Error: downloading needed skin file. Check your connection and try again.")
+    except urllib.error.URLError:
+        print(
+            "Error: downloading needed skin file. Check your connection and "
+            "try again.")
         sys.exit(1)
 
     z = zipfile.ZipFile(METRO_ZIP, 'r')
@@ -248,8 +289,10 @@ def makeSkin():
         opener.addheaders = [{'User-Agent', 'Mozilla/5.0'}]
         urllib.request.install_opener(opener)
         urllib.request.urlretrieve(METRO_PATCH_URL, METRO_PATCH_ZIP)
-    except:
-        print("Error: downloading needed patch file. Check your connection and try again.")
+    except urllib.error.URLError:
+        print(
+            "Error: downloading needed patch file. Check your connection and "
+            "try again.")
         sys.exit(1)
 
     z = zipfile.ZipFile(METRO_PATCH_ZIP, 'r')
@@ -257,38 +300,47 @@ def makeSkin():
     z.close()
 
     # finally apply the patch
-    copy_tree(METRO_PATCH_COPY, METRO_DIR) # use copy_tree not copytree, shutil copytree is broken
+    copy_tree(METRO_PATCH_COPY,
+              METRO_DIR)  # use copy_tree not copytree, shutil copytree is
+    # broken
+
 
 def makeConfig():
     # download the config for wal_steam
-    print ("Downloading config file")
+    print("Downloading config file")
     try:
-        urllib.request.urlretrieve(CONFIG_URL, os.path.join(CONFIG_DIR, CONFIG_FILE))
-    except:
+        urllib.request.urlretrieve(CONFIG_URL,
+                                   os.path.join(CONFIG_DIR, CONFIG_FILE))
+    except urllib.error.URLError:
         # problem with download
         # generate the config instead
         print("Error: downloading needed config file.")
         sys.exit(1)
 
+
 def makeDpi():
     # apply the high dpi
-    print ("Applying the high dpi patches")
+    print("Applying the high dpi patches")
     copy_tree(METRO_PATCH_HDPI, METRO_DIR)
+
 
 def delConfig():
     # delete the config
     if os.path.isdir(CONFIG_DIR):
         shutil.rmtree(CONFIG_DIR)
 
+
 def delCache():
     # delete the cache
     if os.path.isdir(CACHE_DIR):
         shutil.rmtree(CACHE_DIR)
 
+
 def delSkin(steam_dir):
     # delete the skin
     if os.path.isdir(os.path.join(steam_dir, SKIN_NAME)):
         shutil.rmtree(os.path.join(steam_dir, SKIN_NAME))
+
 
 def checkConfig():
     # check for the config
@@ -308,6 +360,7 @@ def checkConfig():
         # config file found!
         print("Wal Steam config found")
 
+
 def checkCache(dpi):
     # check for the cache
     if not os.path.isdir(os.path.join(HOME_DIR, ".cache")):
@@ -321,15 +374,16 @@ def checkCache(dpi):
         makeSkin()
 
         # apply the dpi patches
-        if (dpi==1):
+        if dpi == 1:
             makeDpi()
     else:
         # cache folder exists
         print("Wal Steam cache found")
 
         # apply the dpi patches
-        if (dpi==1):
+        if dpi == 1:
             makeDpi()
+
 
 def checkInstall(oSys, dpi):
     # check if the cache exists, make it if not
@@ -341,6 +395,7 @@ def checkInstall(oSys, dpi):
     # check if the skin is installed, install it if not
     checkSkin(oSys, dpi)
 
+
 def forceUpdate(oSys, dpi):
     # force update the cache and config files
     delConfig()
@@ -348,6 +403,7 @@ def forceUpdate(oSys, dpi):
     delSkin(oSys)
     checkCache(dpi)
     checkConfig()
+
 
 def getOs():
     # check if ~/.steam/steam/skins exists
@@ -366,46 +422,53 @@ def getOs():
         print("Error: Steam install not found!")
         sys.exit(1)
 
-def parseFontArgs(rawArgs):
-    splitArgs = [arg.strip() for arg in rawArgs.split(",")]
 
-    if len(splitArgs) != 4:
+def parseFontArgs(rawArgs):
+    split_args = [arg.strip() for arg in rawArgs.split(",")]
+
+    if len(split_args) != 4:
         print("Error: You must specify all four custom font styles.")
         sys.exit(1)
 
-    return splitArgs
+    return split_args
+
 
 def getArgs():
     # get the arguments with argparse
     description = "Wal Steam"
-    arg = argparse.ArgumentParser(description=description, formatter_class=RawTextHelpFormatter)
+    arg = argparse.ArgumentParser(description=description,
+                                  formatter_class=RawTextHelpFormatter)
 
     arg.add_argument("-v", "--version", action="store_true",
-        help="Print wal_steam version.")
+                     help="Print wal_steam version.")
 
     arg.add_argument("-w", action="store_true",
-        help="Get colors from wal.")
+                     help="Get colors from wal.")
 
     arg.add_argument("-g", action="store_true",
-        help="Get colors from wpg.")
+                     help="Get colors from wpg.")
 
     arg.add_argument("-s",
-        help="Enter a custom steam skin directory.")
+                     help="Enter a custom steam skin directory.")
 
     arg.add_argument("-d", action="store_true",
-        help="Apply high dpi patches.")
+                     help="Apply high dpi patches.")
 
     arg.add_argument("-u", action="store_true",
-        help=f"Force update cache, skin, and config file. {CLI_RED}WARNING:{CLI_END} WILL OVERWRITE config.json")
+                     help=f"Force update cache, skin, and config file. {CLI_RED}WARNING:{CLI_END} WILL OVERWRITE config.json")
 
     arg.add_argument("-f", "--fonts",
-        help=textwrap.dedent(f'''
+                     help=textwrap.dedent(f'''
             Specify custom fonts. Enter font styles separated by comma.
-            {CLI_BOLD}Available styles:{CLI_END} basefont, semibold, semilight, light.
-            {CLI_YELLOW}Example:{CLI_END} 'Open Sans, Open Sans Semibold, Open Sans Semilight, Open Sans Light'
-            {CLI_RED}WARNING:{CLI_END} Fonts must already be installed on your system.'''))
+            {CLI_BOLD}Available styles:{CLI_END} basefont, semibold, 
+            semilight, light. 
+            {CLI_YELLOW}Example:{CLI_END} 'Open Sans, Open Sans Semibold, 
+            Open Sans Semilight, Open Sans Light' 
+            {CLI_RED}WARNING:{CLI_END} Fonts must already be installed on 
+            your system.'''))
 
     return arg.parse_args()
+
 
 def main():
     # set default mode to wal
@@ -430,6 +493,7 @@ def main():
     if arguments.g:
         mode = 1
 
+    dpi = None
     # check if user wants high-dpi support
     if arguments.d:
         dpi = 1
@@ -438,14 +502,14 @@ def main():
 
     # allow the user to enter a custom steam install location
     if arguments.s:
-        oSys = arguments.s
+        o_sys = arguments.s
         print("Using custom skin path: " + arguments.s)
     else:
-        # check where the os installed steam
-        # ~/.steam/steam/skins               - common linux install location
-        # ~/.steam/skins                     - used on ubuntu and its derivatives
-        # C:\Program Files (x86)\Steam\skins - used on windows
-        oSys = getOs()
+        # check where the os installed steam ~/.steam/steam/skins
+        # - common linux install location ~/.steam/skins
+        # - used on ubuntu and its derivatives C:\Program Files (
+        # x86)\Steam\skins - used on windows
+        o_sys = getOs()
 
     # allow the user to enter custom font styles
     if arguments.fonts:
@@ -458,13 +522,13 @@ def main():
     if arguments.u:
         print("Force updating cache and config")
         # first remove the cache and config
-        forceUpdate(oSys, dpi)
+        forceUpdate(o_sys, dpi)
         print("Cache and config updated")
         print("Run with -w or -g to apply and re-enable wal_steam")
         sys.exit()
 
     # check for the cache, the skin, and get them if needed
-    checkInstall(oSys, dpi)
+    checkInstall(o_sys, dpi)
 
     # get a list from either wal or wpg based on the mode
     colors = getColors(mode)
@@ -474,11 +538,12 @@ def main():
 
     # get a dictionary of the config settings from the config file
     variables = getConfigVar()
-    walColors = getConfigColor()
+    wal_colors = getConfigColor()
     alpha = getConfigAlpha()
 
     # finally create a temp colors.styles and copy it in updating the skin
-    setCustomStyles(colors, variables, walColors, alpha, oSys, fonts)
+    setCustomStyles(colors, variables, wal_colors, alpha, o_sys, fonts)
+
 
 if __name__ == '__main__':
     main()

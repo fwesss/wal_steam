@@ -3,20 +3,20 @@ import setuptools
 
 try:
     import wal_steam
-except (ImportError):
+except ImportError:
     print("error: wal_steam requires Python 3.5 or greater.")
     quit(1)
 
 VERSION = wal_steam.VERSION
 DOWNLOAD = "https://github.com/kotajacob/wal_steam/archive/%s.tar.gz" % VERSION
 
-
 setuptools.setup(
     name="wal_steam",
     version=VERSION,
     author="Dakota Walsh",
     author_email="kotawalsh@gmail.com",
-    description="A little program that themes the colors for Metro for steam from wal or wpg. Now with windows support!",
+    description="A little program that themes the colors for Metro for steam "
+                "from wal or wpg. Now with windows support!",
     license="MIT",
     url="https://github.com/kotajacob/wal_steam",
     download_url=DOWNLOAD,
